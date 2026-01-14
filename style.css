@@ -1,0 +1,161 @@
+body{
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    margin-top: 100px;
+}
+
+main{
+    display: flex;
+    flex-direction: column;
+    max-width: 1200px;
+    width: 80%;
+    margin: 0 auto; 
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.menu{
+    background-color: rgba(1, 90, 163, 1);
+    display: flex;
+    padding: 0 100px;
+    position: fixed;
+    top: 0;
+    width: 100%;
+}
+
+.menu > ul{
+    width: 100%;
+    display: flex;
+    gap: 90px;
+    justify-content: center;
+    align-items: center;
+    list-style: none;
+    color: white;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.menu img{
+    width: 250px;
+}
+
+.titular{
+    display: flex;
+    justify-content: center;
+}
+
+.titular-precio h2{
+    display: flex;
+    justify-content: center;
+}
+
+.boton-fecha{
+    margin-left: 90px;
+}
+
+.grafico1{
+    box-shadow: 0 0 20px rgba(49, 48, 48, 0.683);
+    padding: 18px;
+    height: 215px;
+}
+
+.sabiasQue{
+    box-shadow: 0 0 20px rgba(49, 48, 48, 0.683);
+    padding: 18px;
+}
+
+.sabias-horas{
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+}
+
+.sabias-horas h1{
+    margin: 0;
+}
+
+.sabias-horas h3{
+    color: rgb(13, 212, 13);
+}
+
+main > div{
+    margin-top: 30px;
+    border-radius: 10px;
+}
+
+.precios{
+    padding: 18px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.precios > div{
+    text-align: center;
+}
+
+.precio-medio{
+    box-shadow: 0 0 20px rgba(49, 48, 48, 0.683);
+    padding: 18px;
+}
+
+.precio-bajo{
+    box-shadow: 0 0 20px rgba(49, 48, 48, 0.683);
+    padding: 18px;
+}
+
+.verde{
+    color: green;
+}
+
+.precio-alto{
+    box-shadow: 0 0 20px rgba(49, 48, 48, 0.683);
+    padding: 18px;
+}
+
+.rojo{
+    color: red;
+}
+
+.precioMedio-mensual{
+    box-shadow: 0 0 20px rgba(49, 48, 48, 0.683);
+    padding: 18px;
+}
+
+.listaPrecios{
+    box-shadow: 0 0 20px rgba(49, 48, 48, 0.683);
+    padding: 18px;
+    display: flex;
+    justify-content: center;
+}
+
+@media screen and (max-width: 1480px) {
+    .menu > ul{
+        gap: 40px;
+    }
+}
+
+@media screen and (max-width: 1250px) {
+    .menu > ul{
+        gap: 30px;
+    }
+}
+
+@media screen and (max-width: 1180px) {
+    .menu > ul{
+        gap: 20px;
+    }
+}
+
+@media screen and (max-width: 1130px) {
+    .menu > ul{
+        display: none;
+    }
+}
+
+@media screen and (max-width: 700px) {
+   .precios{
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+   }
+}
