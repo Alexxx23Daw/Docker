@@ -1,0 +1,32 @@
+services:
+  db:
+    image: mariadb:10.6
+    container_name: nc_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: ncuser
+      MYSQL_PASSWORD: ncpass
+    volumes:
+      - db_data:/var/lib/mysql
+
+  app:
+    image: nextcloud
+    container_name: nc_app
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      MYSQL_HOST: db
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: ncuser
+      MYSQL_PASSWORD: ncpass
+    volumes:
+      - nc_data:/var/www/html
+    depends_on:
+      - db
+
+volumes:
+  db_data:
+  nc_data:

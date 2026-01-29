@@ -1,0 +1,28 @@
+version: '3.1'
+
+services:
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb_tienda
+    environment:
+      - MARIADB_USER=pepe
+      - MARIADB_PASSWORD=pepe
+      - MARIADB_DATABASE=mitienda
+      - MARIADB_ROOT_PASSWORD=contraseña_root_segura
+
+  prestashop:
+    image: prestashop/prestashop
+    container_name: servidor_prestashop
+    ports:
+      - 80:80
+    environment:
+      - PRESTASHOP_DATABASE_HOST=mariadb_tienda
+      - PRESTASHOP_DATABASE_PORT_NUMBER=3306
+      - PRESTASHOP_DATABASE_USER=pepe
+      - PRESTASHOP_DATABASE_PASSWORD=pepe
+      - PRESTASHOP_DATABASE_NAME=mitienda
+      - PRESTASHOP_HOST=localhost  
+
+    depends_on:
+      - mariadb
+
