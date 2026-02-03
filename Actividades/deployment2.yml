@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment2
+  annotations:
+    description: "Despliegue incial de la aplicacion - version 1"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-test
+  template:
+    metadata:
+      labels:
+        app: web-test
+    spec:
+      containers:
+        - name: web-container
+          image: iesgn/test_web:version1
+          ports:
+            - containerPort: 80
