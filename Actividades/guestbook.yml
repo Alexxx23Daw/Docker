@@ -7,13 +7,16 @@ spec:
   selector:
     matchLabels:
       app: guestbook
+      tier: frontend
   template:
     metadata:
       labels:
         app: guestbook
+        tier: frontend
     spec:
       containers:
         - name: guestbook
           image: iesgn/guestbook
           ports:
-            - containerPort: 5000
+          - name: http-server  
+            containerPort: 5000

@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lets-chat
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: lets-chat
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: lets-chat
+        tier: frontend
+    spec:
+      containers:
+      - name: lets-chat
+        image: sdelements/lets-chat
+        ports:
+        - containerPort: 8080
+        env:
+        - name: MONGO_URI
+          value: "mongodb://mongo:27017/lets-chat"
