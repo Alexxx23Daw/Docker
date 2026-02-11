@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup-nginx-semanal
+spec:
+  schedule: "0 2 * * 0"  # Domingo a las 02:00
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        spec:
+          containers:
+          - name: backup-nginx
+            image: nginx:latest
+            command:
+              - /bin/sh
+              - -c
+              - |
+                echo "Iniciando backup de Nginx..."
+                tar -czf /tmp/nginx-backup-$(date +%F).tar.gz /etc/nginx
+                echo "Backup completado"
+            volumeMounts:
+              - name: backup-volume
+                mountPath: /tmp
+          restartPolicy: OnFailure
+          volumes:
+            - name: backup-volume
+              emptyDir: {}

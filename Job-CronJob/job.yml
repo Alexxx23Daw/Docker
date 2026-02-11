@@ -1,0 +1,13 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ejemplo-job
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      containers:
+      - name: contenedor-job
+        image: busybox
+        command: ["echo", "Hola desde el Job"]
+      restartPolicy: Never
