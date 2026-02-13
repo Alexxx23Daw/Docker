@@ -1,0 +1,5 @@
+replicaCount: 1
+
+ingress:
+  host: hello-app.example.com
+  
