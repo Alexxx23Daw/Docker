@@ -3,28 +3,34 @@ kind: StatefulSet
 metadata:
   name: mysql
 spec:
-  serviceName: mysql
-  replicas: 3
   selector:
     matchLabels:
       app: mysql
+  serviceName: mysql
+  replicas: 3
   template:
     metadata:
       labels:
         app: mysql
     spec:
+      securityContext:
+        fsGroup: 999
       initContainers:
       - name: init-mysql
         image: mysql:5.7
         command:
-        - sh
-        - -c
+        - bash
+        - "-c"
         - |
           set -ex
-          ordinal=$(echo $HOSTNAME | awk -F '-' '{print $NF}')
-          echo "[mysqld]" > /mnt/conf.d/server-id.cnf
-          echo "server-id=$((100 + ordinal))" >> /mnt/conf.d/server-id.cnf
-          if [ "$ordinal" -eq 0 ]; then
+          # Numera los servidores en función del índice del pod
+          [[ "$HOSTNAME" =~ -([0-9]+)$ ]] || exit 1
+          ordinal=${BASH_REMATCH[1]}
+          echo [mysqld] > /mnt/conf.d/server-id.cnf
+          # Establece el número del servidor a partir de 100
+          echo server-id=$((100 + $ordinal)) >> /mnt/conf.d/server-id.cnf
+          # Modifica MySQL con el ConfigMap en función de si es el primario (0) o no
+          if [[ $ordinal -eq 0 ]]; then
             cp /mnt/config-map/primary.cnf /mnt/conf.d/
           else
             cp /mnt/config-map/replica.cnf /mnt/conf.d/
@@ -35,20 +41,29 @@ spec:
         - name: config-map
           mountPath: /mnt/config-map
       - name: clone-mysql
-        image: gcr.io/google-samples/xtrabackup:1.0
+        image: percona/percona-xtrabackup:2.4
         command:
-        - sh
-        - -c
+        - bash
+        - "-c"
         - |
           set -ex
-          if [ -d /var/lib/mysql/mysql ]; then exit 0; fi
-          ordinal=$(echo $HOSTNAME | awk -F '-' '{print $NF}')
-          [ "$ordinal" -eq 0 ] && exit 0
-          ncat --recv-only mysql-$((ordinal-1)).mysql 3307 | xbstream -x -C /var/lib/mysql
+          # No clona si ya existen datos.
+          [[ -d /var/lib/mysql/mysql ]] && exit 0
+          # No clona si se trata del primario.
+          [[ "$HOSTNAME" =~ -([0-9]+)$ ]] || exit 1
+          ordinal=${BASH_REMATCH[1]}
+          [[ $ordinal -eq 0 ]] && exit 0
+          # Clona los datos del pod inmediatamente anterior
+          until bash -c "echo > /dev/tcp/mysql-$(($ordinal-1)).mysql/3307" 2>/dev/null; do
+            echo "Esperando a mysql-$(($ordinal-1))..."
+            sleep 2
+          done
+          socat -u TCP:mysql-$(($ordinal-1)).mysql:3307 STDOUT | xbstream -x -C /var/lib/mysql
           xtrabackup --prepare --target-dir=/var/lib/mysql
         volumeMounts:
         - name: data
           mountPath: /var/lib/mysql
+          subPath: mysql
         - name: conf
           mountPath: /etc/mysql/conf.d
       containers:
@@ -63,6 +78,7 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /var/lib/mysql
+          subPath: mysql
         - name: conf
           mountPath: /etc/mysql/conf.d
         resources:
@@ -71,46 +87,66 @@ spec:
             memory: 1Gi
         livenessProbe:
           exec:
-            command: ["mysqladmin","ping"]
+            command: ["mysqladmin", "ping"]
           initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 5
         readinessProbe:
           exec:
-            command: ["mysql","-h","127.0.0.1","-e","SELECT 1"]
+            # Comprueba si se pueden hacer consultas sobre TCP
+            command: ["mysql", "-h", "127.0.0.1", "-e", "SELECT 1"]
           initialDelaySeconds: 5
           periodSeconds: 2
           timeoutSeconds: 1
       - name: xtrabackup
-        image: gcr.io/google-samples/xtrabackup:1.0
+        image: percona/percona-xtrabackup:2.4
         ports:
         - name: xtrabackup
           containerPort: 3307
         command:
-        - sh
-        - -c
+        - bash
+        - "-c"
         - |
           set -ex
           cd /var/lib/mysql
-          if [ -f xtrabackup_slave_info ] && [ "x$(<xtrabackup_slave_info)" != "x" ]; then
+
+          # Determina la posición de log a clonar.
+          if [[ -f xtrabackup_slave_info && "x$(<xtrabackup_slave_info)" != "x" ]]; then
+            # Modificaciones previas
             cat xtrabackup_slave_info | sed -E 's/;$//g' > change_master_to.sql.in
             rm -f xtrabackup_slave_info xtrabackup_binlog_info
-          elif [ -f xtrabackup_binlog_info ]; then
-            read log_file log_pos <<< $(cat xtrabackup_binlog_info)
+          elif [[ -f xtrabackup_binlog_info ]]; then
+            # Si existe xtrabackup_binlog_info, estamos clonando desde el primario
+            [[ `cat xtrabackup_binlog_info` =~ ^(.*?)[[:space:]]+(.*?)$ ]] || exit 1
             rm -f xtrabackup_binlog_info xtrabackup_slave_info
-            echo "CHANGE MASTER TO MASTER_LOG_FILE='$log_file', MASTER_LOG_POS=$log_pos" > change_master_to.sql.in
+            echo "CHANGE MASTER TO MASTER_LOG_FILE='${BASH_REMATCH[1]}',\
+                  MASTER_LOG_POS=${BASH_REMATCH[2]}" > change_master_to.sql.in
           fi
-          if [ -f change_master_to.sql.in ]; then
+
+          # Se comprueba si es necesaria completar un clon iniciando la replicación.
+          if [[ -f change_master_to.sql.in ]]; then
             echo "Esperando a que mysqld esté disponible"
-            until mysql -h 127.0.0.1 -e "SELECT 1"; do sleep 1; done
-            echo "Inicializando réplica"
-            mysql -h 127.0.0.1 -e "$(cat change_master_to.sql.in), MASTER_HOST='mysql-0.mysql', MASTER_USER='root', MASTER_PASSWORD='', MASTER_CONNECT_RETRY=10; START SLAVE;"
+            until mysql -h 127.0.0.1 -u root -e "SELECT 1"; do sleep 1; done
+
+            echo "Inicializando la réplica desde la última modificación"
+            mysql -h 127.0.0.1 -u root \
+                  -e "$(<change_master_to.sql.in), \
+                          MASTER_HOST='mysql-0.mysql', \
+                          MASTER_USER='root', \
+                          MASTER_PASSWORD='', \
+                          MASTER_CONNECT_RETRY=10; \
+                        START SLAVE;" || exit 1
+            # En caso de que el contenedor se reinicie, se intenta de nuevo.
             mv change_master_to.sql.in change_master_to.sql.orig
           fi
-          exec ncat --listen --keep-open --send-only --max-conns=1 3307 -c "xtrabackup --backup --slave-info --stream=xbstream --host=127.0.0.1 --user=root"
+
+          # Lanza un servidor que pueda mandar copias solicitadas por otros.
+          exec socat TCP-LISTEN:3307,reuseaddr,fork EXEC:"xtrabackup --backup --slave-info --stream=xbstream --host=127.0.0.1 --user=root"
+            
         volumeMounts:
         - name: data
           mountPath: /var/lib/mysql
+          subPath: mysql
         - name: conf
           mountPath: /etc/mysql/conf.d
         resources:
